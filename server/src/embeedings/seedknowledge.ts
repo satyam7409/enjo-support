@@ -5,7 +5,14 @@ import { KnowledgeDoc } from "../models/knowledgedoc.model.js";
 
 dotenv.config();
 
-const docs = [
+type KnowledgeCategory = "billing" | "technical" | "account" | "general";
+
+interface SeedDoc {
+  title: string;
+  category: KnowledgeCategory;
+  content: string;
+}
+const docs: SeedDoc[] = [
   {
     title: "Duplicate charges and refunds",
     category: "billing",
