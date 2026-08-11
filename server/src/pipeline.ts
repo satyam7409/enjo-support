@@ -1,23 +1,57 @@
-import { SchemaType } from "@google/generative-ai"; // Import SchemaType
+import { string } from "zod";
 import { model } from "./config/geminiclient.js";
 import { TicketType } from "./models/ticket.model.js";
+import { SchemaType, Schema } from "@google/generative-ai";
 
-const CATEGORIES = ["billing", "technical", "account", "general"];
-const URGENCIES = ["low", "medium", "high"];
+const CATEGORIES = [
+  "billing",
+  "technical",
+  "account",
+  "general",
+];
 
-// Fix 1: Use SchemaType enums instead of raw strings to satisfy TypeScript
-const responseSchema = {
+const URGENCIES = [
+  "low",
+  "medium",
+  "high",
+];
+
+const responseSchema: Schema = {
   type: SchemaType.OBJECT,
   properties: {
-    category: { type: SchemaType.STRING, enum: CATEGORIES },
-    urgency: { type: SchemaType.STRING, enum: URGENCIES },
-    draft: { type: SchemaType.STRING },
-    confidence: { type: SchemaType.NUMBER },
+    category: {
+      type: SchemaType.STRING,
+      format: "enum",
+      enum: CATEGORIES,
+    },
+
+    urgency: {
+      type: SchemaType.STRING,
+      format: "enum",
+      enum: URGENCIES,
+    },
+
+    draft: {
+      type: SchemaType.STRING,
+    },
+
+    confidence: {
+      type: SchemaType.NUMBER,
+    },
   },
-  required: ["category", "urgency", "draft", "confidence"],
+
+  required: [
+    "category",
+    "urgency",
+    "draft",
+    "confidence",
+  ],
 };
 
-function buildPrompt(ticket: TicketType, knowledgeContext: string) {
+function buildPrompt(
+  ticket: TicketType,
+  knowledgeContext: string|null
+) {
   return `You are a support agent assistant for a SaaS product. Read the customer's
 ticket and respond with JSON only, matching the required schema.
 
@@ -31,6 +65,7 @@ ${
 }
 
 Instructions:
+
 - category: classify as one of billing, technical, account, general.
 - urgency: low, medium, or high based on how time-sensitive/impactful this is.
 - draft: write a short, friendly reply (2-4 sentences) grounded ONLY in the
@@ -42,12 +77,20 @@ Instructions:
   irrelevant, or only partially relevant. Do not inflate this number.`;
 }
 
-// Fix 2: Keep the "export" keyword here, but delete the module.exports at the bottom.
-export async function processTicketWithAI(ticket: TicketType, knowledgeContext: string) {
+export async function processTicketWithAI(
+  ticket: TicketType,
+  knowledgeContext: string | null
+) {
   const prompt = buildPrompt(ticket, knowledgeContext);
 
   const result = await model.generateContent({
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: prompt }],
+      },
+    ],
+
     generationConfig: {
       responseMimeType: "application/json",
       responseSchema,
@@ -56,13 +99,16 @@ export async function processTicketWithAI(ticket: TicketType, knowledgeContext: 
   });
 
   const text = result.response.text();
+
   const parsed = JSON.parse(text);
 
   return {
     category: parsed.category,
     urgency: parsed.urgency,
     aiDraft: parsed.draft,
-    confidenceScore: Math.max(0, Math.min(1, parsed.confidence)),
+    confidenceScore: Math.max(
+      0,
+      Math.min(1, parsed.confidence)
+    ),
   };
 }
-
